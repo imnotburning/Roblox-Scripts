@@ -26,6 +26,9 @@ local SelectedTeams = {}
 local ActiveEspConnections = {} 
 local flightConnection, noclipConnection, bodyGyro, bodyVel
 
+-- Highlight Storage
+local ActiveHighlights = {}
+
 -- --- CREATE GUI LAYOUT ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BurningsAdminPanelGui"
@@ -68,12 +71,12 @@ local CombatPage = makePage("Combat", false)
 local AdminPage = makePage("Admin", false)
 local MiscPage = makePage("Misc", false)
 
--- --- FIXED: HORIZONTAL SCROLLING CATEGORY BAR ---
+-- --- HORIZONTAL SCROLLING CATEGORY BAR ---
 local nav = Instance.new("ScrollingFrame")
-nav.Size = UDim2.new(1, -35, 0, 35) -- Leaves space on the right for the minimize button
+nav.Size = UDim2.new(1, -35, 0, 35)
 nav.Position = UDim2.new(0, 0, 0, 0)
 nav.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-nav.CanvasSize = UDim2.new(0, 320, 0, 0) -- Extends horizontally to allow clean scrolling
+nav.CanvasSize = UDim2.new(0, 320, 0, 0)
 nav.ScrollBarThickness = 2
 nav.VerticalScrollBarSides = Enum.VerticalScrollBarPosition.Right
 nav.ScrollingDirection = Enum.ScrollingDirection.Horizontal
@@ -87,7 +90,6 @@ navLayout.Padding = UDim.new(0, 6)
 navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 navLayout.Parent = nav
 
--- Simple padding inside the scrolling container
 local navPadding = Instance.new("UIPadding")
 navPadding.PaddingLeft = UDim.new(0, 6)
 navPadding.PaddingRight = UDim.new(0, 6)
@@ -95,7 +97,7 @@ navPadding.Parent = nav
 
 local function tabBtn(text, order, pageName)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 70, 0, 25) -- Clear fixed button sizes for clean scrolling
+    btn.Size = UDim2.new(0, 70, 0, 25)
     btn.BackgroundColor3 = pageName == "Move" and Color3.fromRGB(40, 40, 55) or Color3.fromRGB(20, 20, 28)
     btn.Text = text
     btn.TextColor3 = pageName == "Move" and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(150, 150, 150)
@@ -123,7 +125,7 @@ tabBtn("Combat", 2, "Combat")
 tabBtn("Admins", 3, "Admin")
 tabBtn("Misc", 4, "Misc")
 
--- Minimize Button (Kept static on the top right)
+-- Minimize Button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.new(0, 30, 0, 35)
 MinBtn.Position = UDim2.new(1, -30, 0, 0)
@@ -230,15 +232,72 @@ TpBtn.TextSize = 12
 TpBtn.Parent = TpRow
 Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 4)
 
--- ESP Elements
+-- --- COMBAT TAB VISUAL TOOLS ---
 local EspBtn = quickBtn(CombatPage, "ESP: OFF", Color3.fromRGB(180, 40, 40), function(btn)
     EspActive = not EspActive
     btn.Text = EspActive and "ESP: ACTIVE" or "ESP: OFF"
     btn.BackgroundColor3 = EspActive and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(180, 40, 40)
 end)
 
+-- Visual Target Outline Tool
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0.9, 0, 0, 18)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Visual Target Highlight:"
+TargetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TargetLabel.Font = Enum.Font.SourceSansBold
+TargetLabel.TextSize = 12
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.Parent = CombatPage
+
+local TargetRow = Instance.new("Frame")
+TargetRow.Size = UDim2.new(0.9, 0, 0, 26)
+TargetRow.BackgroundTransparency = 1
+TargetRow.Parent = CombatPage
+
+local TargetInput = Instance.new("TextBox")
+TargetInput.Size = UDim2.new(0.6, 0, 1, 0)
+TargetInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+TargetInput.PlaceholderText = "Target Username..."
+TargetInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+TargetInput.Text = ""
+TargetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetInput.Font = Enum.Font.SourceSansBold
+TargetInput.TextSize = 12
+TargetInput.Parent = TargetRow
+Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 4)
+
+local HighlightBtn = Instance.new("TextButton")
+HighlightBtn.Size = UDim2.new(0.35, 0, 1, 0)
+HighlightBtn.Position = UDim2.new(0.65, 0, 0, 0)
+HighlightBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+HighlightBtn.Text = "Highlight"
+HighlightBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HighlightBtn.Font = Enum.Font.SourceSansBold
+HighlightBtn.TextSize = 12
+HighlightBtn.Parent = TargetRow
+Instance.new("UICorner", HighlightBtn).CornerRadius = UDim.new(0, 4)
+
+local ClearHighlightBtn = quickBtn(CombatPage, "Clear Target Highlights", Color3.fromRGB(180, 40, 40), function()
+    for _, instance in pairs(ActiveHighlights) do
+        if instance then instance:Destroy() end
+    end
+    ActiveHighlights = {}
+end)
+
+-- Team Scroll List for ESP filters
+local TeamScrollLabel = Instance.new("TextLabel")
+TeamScrollLabel.Size = UDim2.new(0.9, 0, 0, 18)
+TeamScrollLabel.BackgroundTransparency = 1
+TeamScrollLabel.Text = "Filter ESP by Teams:"
+TeamScrollLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TeamScrollLabel.Font = Enum.Font.SourceSansBold
+TeamScrollLabel.TextSize = 11
+TeamScrollLabel.TextXAlignment = Enum.TextXAlignment.Left
+TeamScrollLabel.Parent = CombatPage
+
 local TeamScroll = Instance.new("ScrollingFrame")
-TeamScroll.Size = UDim2.new(0.9, 0, 0, 120)
+TeamScroll.Size = UDim2.new(0.9, 0, 0, 70)
 TeamScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 TeamScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 TeamScroll.ScrollBarThickness = 2
@@ -247,7 +306,7 @@ local TeamLay = Instance.new("UIListLayout")
 TeamLay.Parent = TeamScroll
 TeamLay.Padding = UDim.new(0, 4)
 
--- Admins Card
+-- --- ADMIN PAGE ---
 local AdminCard = Instance.new("Frame")
 AdminCard.Size = UDim2.new(0.9, 0, 0, 60)
 AdminCard.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -283,7 +342,6 @@ AdminId.TextSize = 11
 AdminId.TextXAlignment = Enum.TextXAlignment.Left
 AdminId.Parent = AdminCard
 
--- Setup profile image asynchronously
 task.spawn(function()
     pcall(function()
         local id = Players:GetUserIdFromNameAsync(AuthorizedUsername)
@@ -551,7 +609,6 @@ WalkBox.FocusLost:Connect(function()
     WalkBox.Text = tostring(TargetWalkSpeed)
 end)
 
--- Flight Speed Setup
 FlyBox.FocusLost:Connect(function()
     local n = tonumber(FlyBox.Text)
     TargetFlySpeed = n and math.clamp(n, 0, 500) or TargetFlySpeed
@@ -578,6 +635,34 @@ TpBtn.MouseButton1Click:Connect(function()
                 status.Text = "Status: Teleported to " .. p.Name
                 task.wait(1)
                 status.Text = "Status: Online"
+            end
+            break
+        end
+    end
+end)
+
+-- Highlight Creation Action
+HighlightBtn.MouseButton1Click:Connect(function()
+    local query = string.lower(TargetInput.Text)
+    if query == "" then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and (string.sub(string.lower(p.Name), 1, #query) == query or string.sub(string.lower(p.DisplayName), 1, #query) == query) then
+            local char = p.Character
+            if char then
+                -- Clear previous highlights on this player if any exist
+                if ActiveHighlights[p.UserId] then
+                    ActiveHighlights[p.UserId]:Destroy()
+                end
+                
+                -- Create standard client visual 3D selection outline
+                local selectionBox = Instance.new("SelectionBox")
+                selectionBox.Color3 = Color3.fromRGB(255, 230, 0) -- Visible Gold
+                selectionBox.LineThickness = 0.05
+                selectionBox.Adornee = char
+                selectionBox.Parent = char
+                
+                ActiveHighlights[p.UserId] = selectionBox
             end
             break
         end
