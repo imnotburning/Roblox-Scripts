@@ -68,29 +68,47 @@ local CombatPage = makePage("Combat", false)
 local AdminPage = makePage("Admin", false)
 local MiscPage = makePage("Misc", false)
 
--- Navigation Buttons
-local nav = Instance.new("Frame")
-nav.Size = UDim2.new(1, 0, 0, 35)
+-- --- FIXED: HORIZONTAL SCROLLING CATEGORY BAR ---
+local nav = Instance.new("ScrollingFrame")
+nav.Size = UDim2.new(1, -35, 0, 35) -- Leaves space on the right for the minimize button
+nav.Position = UDim2.new(0, 0, 0, 0)
 nav.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+nav.CanvasSize = UDim2.new(0, 320, 0, 0) -- Extends horizontally to allow clean scrolling
+nav.ScrollBarThickness = 2
+nav.VerticalScrollBarSides = Enum.VerticalScrollBarPosition.Right
+nav.ScrollingDirection = Enum.ScrollingDirection.Horizontal
 nav.Parent = MainFrame
 Instance.new("UICorner", nav).CornerRadius = UDim.new(0, 8)
 
-local function tabBtn(text, pos, pageName)
+local navLayout = Instance.new("UIListLayout")
+navLayout.FillDirection = Enum.FillDirection.Horizontal
+navLayout.SortOrder = Enum.SortOrder.LayoutOrder
+navLayout.Padding = UDim.new(0, 6)
+navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+navLayout.Parent = nav
+
+-- Simple padding inside the scrolling container
+local navPadding = Instance.new("UIPadding")
+navPadding.PaddingLeft = UDim.new(0, 6)
+navPadding.PaddingRight = UDim.new(0, 6)
+navPadding.Parent = nav
+
+local function tabBtn(text, order, pageName)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.2, 0, 0, 25)
-    btn.Position = pos
+    btn.Size = UDim2.new(0, 70, 0, 25) -- Clear fixed button sizes for clean scrolling
     btn.BackgroundColor3 = pageName == "Move" and Color3.fromRGB(40, 40, 55) or Color3.fromRGB(20, 20, 28)
     btn.Text = text
     btn.TextColor3 = pageName == "Move" and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(150, 150, 150)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 11
+    btn.LayoutOrder = order
     btn.Parent = nav
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     
     btn.MouseButton1Click:Connect(function()
         for pName, pObj in pairs(pages) do pObj.Visible = (pName == pageName) end
         for _, otherBtn in ipairs(nav:GetChildren()) do
-            if otherBtn:IsA("TextButton") and otherBtn.Text ~= "[-]" then
+            if otherBtn:IsA("TextButton") then
                 otherBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
                 otherBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
             end
@@ -100,27 +118,29 @@ local function tabBtn(text, pos, pageName)
     end)
 end
 
-tabBtn("Move", UDim2.new(0, 5, 0, 5), "Move")
-tabBtn("Combat", UDim2.new(0.2, 10, 0, 5), "Combat")
-tabBtn("Admins", UDim2.new(0.4, 15, 0, 5), "Admin")
-tabBtn("Misc", UDim2.new(0.6, 20, 0, 5), "Misc")
+tabBtn("Move", 1, "Move")
+tabBtn("Combat", 2, "Combat")
+tabBtn("Admins", 3, "Admin")
+tabBtn("Misc", 4, "Misc")
 
--- Minimize Button
+-- Minimize Button (Kept static on the top right)
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 25, 0, 25)
-MinBtn.Position = UDim2.new(1, -30, 0, 5)
-MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+MinBtn.Size = UDim2.new(0, 30, 0, 35)
+MinBtn.Position = UDim2.new(1, -30, 0, 0)
+MinBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 MinBtn.Text = "[-]"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.Font = Enum.Font.SourceSansBold
-MinBtn.Parent = nav
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
+MinBtn.Parent = MainFrame
+local MinCorner = Instance.new("UICorner", MinBtn)
+MinCorner.CornerRadius = UDim.new(0, 8)
 
 local isMin = false
 MinBtn.MouseButton1Click:Connect(function()
     isMin = not isMin
     MainFrame:TweenSize(isMin and UDim2.new(0, 260, 0, 35) or UDim2.new(0, 260, 0, 270), "Out", "Quart", 0.2, true)
     MinBtn.Text = isMin and "[+]" or "[-]"
+    nav.Visible = not isMin
     for _, p in pairs(pages) do p.Visible = not isMin and (p.Parent.Name == p.Name) or false end
 end)
 
@@ -513,12 +533,12 @@ local Hop = quickBtn(MiscPage, "Server Hop", Color3.fromRGB(40, 40, 55), functio
     end
 end)
 
--- FIXED/ADDED: Client Character Reset Utility (No Fling)
+-- Client Character Reset Utility
 local ResetBtn = quickBtn(MiscPage, "Reset Character", Color3.fromRGB(180, 40, 40), function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
-        hum.Health = 0 -- Triggers the natural game respawn instantly
+        hum.Health = 0
     end
 end)
 
