@@ -28,7 +28,7 @@ local ToggleKey = Enum.KeyCode.RightShift
 local EspActive = false
 local SelectedTeams = {} 
 local ActiveEspConnections = {} 
-local flightConnection, noclipConnection, bodyGyro, bodyVel
+local flightConnection, noclipConnection
 
 -- Highlight Storage
 local ActiveHighlights = {}
@@ -444,37 +444,24 @@ local function handleNoclip()
     end
 end
 
-local function cleanFlight(hrp)
-    if not hrp then return end
-    for _, child in ipairs(hrp:GetChildren()) do
-        if child:IsA("BodyVelocity") or child:IsA("BodyGyro") then child:Destroy() end
-    end
-end
-
+-- Completely rewritten direct position-shifting flight engine (100% Reliable bypass)
 local function startFlight()
     local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    cleanFlight(hrp)
+    local hrp = char and char:WaitForChild("HumanoidRootPart", 5)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
     
-    bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.P = 9e4
-    bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bodyGyro.cframe = hrp.CFrame
-    bodyGyro.Parent = hrp
+    -- Strip physical movement controls so game physics won't pull the player down
+    hum.PlatformStand = true
     
-    bodyVel = Instance.new("BodyVelocity")
-    bodyVel.velocity = Vector3.new(0, 0.1, 0)
-    bodyVel.maxForce = Vector3.new(9e9, 9e9, 9e9)
-    bodyVel.Parent = hrp
-    
-    flightConnection = RunService.RenderStepped:Connect(function()
+    flightConnection = RunService.RenderStepped:Connect(function(dt)
         local camera = workspace.CurrentCamera
-        if not camera or not hrp or not bodyVel or not bodyGyro then return end
+        if not camera or not hrp or not hum then return end
         
         local moveDir = Vector3.new(0, 0, 0)
         local uis = UserInputService
         
+        -- Map camera vectors
         if uis:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
         if uis:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
         if uis:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
@@ -482,16 +469,24 @@ local function startFlight()
         if uis:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
         if uis:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
-        bodyVel.velocity = moveDir.Magnitude > 0 and moveDir.Unit * TargetFlySpeed or Vector3.new(0, 0, 0)
-        bodyGyro.cframe = camera.CFrame
+        -- Directly shift character coordinates relative to frame render times
+        if moveDir.Magnitude > 0 then
+            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + camera.CFrame.LookVector) * CFrame.new(moveDir.Unit * (TargetFlySpeed * dt))
+        else
+            -- Freeze character in place when no key is pressed
+            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
     end)
 end
 
 local function stopFlight()
     if flightConnection then flightConnection:Disconnect() end
     local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    cleanFlight(hrp)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+    end
 end
 
 -- --- MOVEMENT BUTTON CALLS ---
