@@ -1,7 +1,11 @@
--- Destroy old GUI to prevent overlapping
+-- Destroy old GUI to prevent overlapping (Checks both CoreGui and PlayerGui)
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = game:GetService("Players").LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
+if CoreGui:FindFirstChild("BurningsAdminPanelGui") then
+    CoreGui.BurningsAdminPanelGui:Destroy()
+end
 if PlayerGui:FindFirstChild("BurningsAdminPanelGui") then
     PlayerGui.BurningsAdminPanelGui:Destroy()
 end
@@ -26,11 +30,92 @@ local SelectedTeams = {}
 local ActiveEspConnections = {} 
 local flightConnection, noclipConnection, bodyGyro, bodyVel
 
--- --- CREATE GUI LAYOUT ---
+-- Highlight Storage
+local ActiveHighlights = {}
+
+-- --- CREATE GUI LAYOUT ON COREGUI (FORCES TOP LAYER) ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BurningsAdminPanelGui"
-ScreenGui.Parent = PlayerGui
+ScreenGui.DisplayOrder = 99999 -- Ensures maximum draw priority
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = PlayerGui -- Safe fallback if exploit lacks CoreGui access
+end
 ScreenGui.ResetOnSpawn = false
+
+-- --- INTACTIVE LOADING SCREEN ---
+local LoadingFrame = Instance.new("Frame")
+LoadingFrame.Size = UDim2.new(1, 0, 1, 0)
+LoadingFrame.Position = UDim2.new(0, 0, 0, 0)
+LoadingFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+LoadingFrame.Active = true
+LoadingFrame.Visible = true
+LoadingFrame.Parent = ScreenGui
+
+-- Pulsing Ambient Glow Background
+local Glow = Instance.new("ImageLabel")
+Glow.Size = UDim2.new(0, 400, 0, 400)
+Glow.Position = UDim2.new(0.5, -200, 0.5, -200)
+Glow.BackgroundTransparency = 1
+Glow.Image = "rbxassetid://6015897843" -- Soft light emission texture
+Glow.ImageColor3 = Color3.fromRGB(255, 60, 60)
+Glow.ImageTransparency = 0.85
+Glow.Parent = LoadingFrame
+
+local LoadContainer = Instance.new("Frame")
+LoadContainer.Size = UDim2.new(0, 300, 0, 180)
+LoadContainer.Position = UDim2.new(0.5, -150, 0.5, -90)
+LoadContainer.BackgroundTransparency = 1
+LoadContainer.Parent = LoadingFrame
+
+local PanelTitle = Instance.new("TextLabel")
+PanelTitle.Size = UDim2.new(1, 0, 0, 30)
+PanelTitle.Position = UDim2.new(0, 0, 0, 10)
+PanelTitle.BackgroundTransparency = 1
+PanelTitle.Text = "BURNING'S ADMIN"
+PanelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PanelTitle.Font = Enum.Font.SourceSansBold
+PanelTitle.TextSize = 24
+PanelTitle.TextTracking = 3
+PanelTitle.Parent = LoadContainer
+
+local PanelSubtitle = Instance.new("TextLabel")
+PanelSubtitle.Size = UDim2.new(1, 0, 0, 20)
+PanelSubtitle.Position = UDim2.new(0, 0, 0, 40)
+PanelSubtitle.BackgroundTransparency = 1
+PanelSubtitle.Text = "SYSTEM INITIALIZATION"
+PanelSubtitle.TextColor3 = Color3.fromRGB(255, 60, 60)
+PanelSubtitle.Font = Enum.Font.SourceSansBold
+PanelSubtitle.TextSize = 12
+PanelSubtitle.Parent = LoadContainer
+
+-- Modern Loading Progress Bar Track
+local ProgressTrack = Instance.new("Frame")
+ProgressTrack.Size = UDim2.new(0.9, 0, 0, 6)
+ProgressTrack.Position = UDim2.new(0.05, 0, 0, 100)
+ProgressTrack.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+ProgressTrack.BorderSizePixel = 0
+ProgressTrack.Parent = LoadContainer
+Instance.new("UICorner", ProgressTrack).CornerRadius = UDim.new(0, 3)
+
+local ProgressFill = Instance.new("Frame")
+ProgressFill.Size = UDim2.new(0, 0, 1, 0) -- Starts at 0%
+ProgressFill.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+ProgressFill.BorderSizePixel = 0
+ProgressFill.Parent = ProgressTrack
+Instance.new("UICorner", ProgressFill).CornerRadius = UDim.new(0, 3)
+
+local LoadingStatus = Instance.new("TextLabel")
+LoadingStatus.Size = UDim2.new(1, 0, 0, 20)
+LoadingStatus.Position = UDim2.new(0, 0, 0, 115)
+LoadingStatus.BackgroundTransparency = 1
+LoadingStatus.Text = "Initializing Core..."
+LoadingStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+LoadingStatus.Font = Enum.Font.SourceSansItalic
+LoadingStatus.TextSize = 11
+LoadingStatus.Parent = LoadContainer
 
 -- --- MAIN ADMIN PANEL ---
 local MainFrame = Instance.new("Frame")
@@ -39,7 +124,7 @@ MainFrame.Position = UDim2.new(0.5, -130, 0.4, -135)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Visible = true
+MainFrame.Visible = false -- Hidden until loaded
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
@@ -68,29 +153,46 @@ local CombatPage = makePage("Combat", false)
 local AdminPage = makePage("Admin", false)
 local MiscPage = makePage("Misc", false)
 
--- Navigation Buttons
-local nav = Instance.new("Frame")
-nav.Size = UDim2.new(1, 0, 0, 35)
+-- --- HORIZONTAL SCROLLING CATEGORY BAR ---
+local nav = Instance.new("ScrollingFrame")
+nav.Size = UDim2.new(1, -35, 0, 35)
+nav.Position = UDim2.new(0, 0, 0, 0)
 nav.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+nav.CanvasSize = UDim2.new(0, 320, 0, 0)
+nav.ScrollBarThickness = 2
+nav.VerticalScrollBarSides = Enum.VerticalScrollBarPosition.Right
+nav.ScrollingDirection = Enum.ScrollingDirection.Horizontal
 nav.Parent = MainFrame
 Instance.new("UICorner", nav).CornerRadius = UDim.new(0, 8)
 
-local function tabBtn(text, pos, pageName)
+local navLayout = Instance.new("UIListLayout")
+navLayout.FillDirection = Enum.FillDirection.Horizontal
+navLayout.SortOrder = Enum.SortOrder.LayoutOrder
+navLayout.Padding = UDim.new(0, 6)
+navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+navLayout.Parent = nav
+
+local navPadding = Instance.new("UIPadding")
+navPadding.PaddingLeft = UDim.new(0, 6)
+navPadding.PaddingRight = UDim.new(0, 6)
+navPadding.Parent = nav
+
+local function tabBtn(text, order, pageName)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.2, 0, 0, 25)
-    btn.Position = pos
+    btn.Size = UDim2.new(0, 70, 0, 25)
     btn.BackgroundColor3 = pageName == "Move" and Color3.fromRGB(40, 40, 55) or Color3.fromRGB(20, 20, 28)
     btn.Text = text
     btn.TextColor3 = pageName == "Move" and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(150, 150, 150)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 11
+    btn.LayoutOrder = order
     btn.Parent = nav
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     
     btn.MouseButton1Click:Connect(function()
         for pName, pObj in pairs(pages) do pObj.Visible = (pName == pageName) end
         for _, otherBtn in ipairs(nav:GetChildren()) do
-            if otherBtn:IsA("TextButton") and otherBtn.Text ~= "[-]" then
+            if otherBtn:IsA("TextButton") then
                 otherBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
                 otherBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
             end
@@ -100,27 +202,29 @@ local function tabBtn(text, pos, pageName)
     end)
 end
 
-tabBtn("Move", UDim2.new(0, 5, 0, 5), "Move")
-tabBtn("Combat", UDim2.new(0.2, 10, 0, 5), "Combat")
-tabBtn("Admins", UDim2.new(0.4, 15, 0, 5), "Admin")
-tabBtn("Misc", UDim2.new(0.6, 20, 0, 5), "Misc")
+tabBtn("Move", 1, "Move")
+tabBtn("Combat", 2, "Combat")
+tabBtn("Admins", 3, "Admin")
+tabBtn("Misc", 4, "Misc")
 
 -- Minimize Button
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 25, 0, 25)
-MinBtn.Position = UDim2.new(1, -30, 0, 5)
-MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+MinBtn.Size = UDim2.new(0, 30, 0, 35)
+MinBtn.Position = UDim2.new(1, -30, 0, 0)
+MinBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 MinBtn.Text = "[-]"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.Font = Enum.Font.SourceSansBold
-MinBtn.Parent = nav
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
+MinBtn.Parent = MainFrame
+local MinCorner = Instance.new("UICorner", MinBtn)
+MinCorner.CornerRadius = UDim.new(0, 8)
 
 local isMin = false
 MinBtn.MouseButton1Click:Connect(function()
     isMin = not isMin
     MainFrame:TweenSize(isMin and UDim2.new(0, 260, 0, 35) or UDim2.new(0, 260, 0, 270), "Out", "Quart", 0.2, true)
     MinBtn.Text = isMin and "[+]" or "[-]"
+    nav.Visible = not isMin
     for _, p in pairs(pages) do p.Visible = not isMin and (p.Parent.Name == p.Name) or false end
 end)
 
@@ -210,15 +314,72 @@ TpBtn.TextSize = 12
 TpBtn.Parent = TpRow
 Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 4)
 
--- ESP Elements
+-- --- COMBAT TAB VISUAL TOOLS ---
 local EspBtn = quickBtn(CombatPage, "ESP: OFF", Color3.fromRGB(180, 40, 40), function(btn)
     EspActive = not EspActive
     btn.Text = EspActive and "ESP: ACTIVE" or "ESP: OFF"
     btn.BackgroundColor3 = EspActive and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(180, 40, 40)
 end)
 
+-- Visual Target Outline Tool
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0.9, 0, 0, 18)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Visual Target Highlight:"
+TargetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TargetLabel.Font = Enum.Font.SourceSansBold
+TargetLabel.TextSize = 12
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.Parent = CombatPage
+
+local TargetRow = Instance.new("Frame")
+TargetRow.Size = UDim2.new(0.9, 0, 0, 26)
+TargetRow.BackgroundTransparency = 1
+TargetRow.Parent = CombatPage
+
+local TargetInput = Instance.new("TextBox")
+TargetInput.Size = UDim2.new(0.6, 0, 1, 0)
+TargetInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+TargetInput.PlaceholderText = "Target Username..."
+TargetInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+TargetInput.Text = ""
+TargetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetInput.Font = Enum.Font.SourceSansBold
+TargetInput.TextSize = 12
+TargetInput.Parent = TargetRow
+Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 4)
+
+local HighlightBtn = Instance.new("TextButton")
+HighlightBtn.Size = UDim2.new(0.35, 0, 1, 0)
+HighlightBtn.Position = UDim2.new(0.65, 0, 0, 0)
+HighlightBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+HighlightBtn.Text = "Highlight"
+HighlightBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HighlightBtn.Font = Enum.Font.SourceSansBold
+HighlightBtn.TextSize = 12
+HighlightBtn.Parent = TargetRow
+Instance.new("UICorner", HighlightBtn).CornerRadius = UDim.new(0, 4)
+
+local ClearHighlightBtn = quickBtn(CombatPage, "Clear Target Highlights", Color3.fromRGB(180, 40, 40), function()
+    for _, instance in pairs(ActiveHighlights) do
+        if instance then instance:Destroy() end
+    end
+    ActiveHighlights = {}
+end)
+
+-- Team Scroll List for ESP filters
+local TeamScrollLabel = Instance.new("TextLabel")
+TeamScrollLabel.Size = UDim2.new(0.9, 0, 0, 18)
+TeamScrollLabel.BackgroundTransparency = 1
+TeamScrollLabel.Text = "Filter ESP by Teams:"
+TeamScrollLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TeamScrollLabel.Font = Enum.Font.SourceSansBold
+TeamScrollLabel.TextSize = 11
+TeamScrollLabel.TextXAlignment = Enum.TextXAlignment.Left
+TeamScrollLabel.Parent = CombatPage
+
 local TeamScroll = Instance.new("ScrollingFrame")
-TeamScroll.Size = UDim2.new(0.9, 0, 0, 120)
+TeamScroll.Size = UDim2.new(0.9, 0, 0, 70)
 TeamScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 TeamScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 TeamScroll.ScrollBarThickness = 2
@@ -227,7 +388,7 @@ local TeamLay = Instance.new("UIListLayout")
 TeamLay.Parent = TeamScroll
 TeamLay.Padding = UDim.new(0, 4)
 
--- Admins Card
+-- --- ADMIN PAGE ---
 local AdminCard = Instance.new("Frame")
 AdminCard.Size = UDim2.new(0.9, 0, 0, 60)
 AdminCard.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -263,7 +424,6 @@ AdminId.TextSize = 11
 AdminId.TextXAlignment = Enum.TextXAlignment.Left
 AdminId.Parent = AdminCard
 
--- Setup profile image asynchronously
 task.spawn(function()
     pcall(function()
         local id = Players:GetUserIdFromNameAsync(AuthorizedUsername)
@@ -513,12 +673,12 @@ local Hop = quickBtn(MiscPage, "Server Hop", Color3.fromRGB(40, 40, 55), functio
     end
 end)
 
--- FIXED/ADDED: Client Character Reset Utility (No Fling)
+-- Client Character Reset Utility
 local ResetBtn = quickBtn(MiscPage, "Reset Character", Color3.fromRGB(180, 40, 40), function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
-        hum.Health = 0 -- Triggers the natural game respawn instantly
+        hum.Health = 0
     end
 end)
 
@@ -531,7 +691,6 @@ WalkBox.FocusLost:Connect(function()
     WalkBox.Text = tostring(TargetWalkSpeed)
 end)
 
--- Flight Speed Setup
 FlyBox.FocusLost:Connect(function()
     local n = tonumber(FlyBox.Text)
     TargetFlySpeed = n and math.clamp(n, 0, 500) or TargetFlySpeed
@@ -564,6 +723,33 @@ TpBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Highlight Creation Action
+HighlightBtn.MouseButton1Click:Connect(function()
+    local query = string.lower(TargetInput.Text)
+    if query == "" then return end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and (string.sub(string.lower(p.Name), 1, #query) == query or string.sub(string.lower(p.DisplayName), 1, #query) == query) then
+            local char = p.Character
+            if char then
+                if ActiveHighlights[p.UserId] then
+                    ActiveHighlights[p.UserId]:Destroy()
+                end
+                
+                -- Create standard client visual 3D selection outline
+                local selectionBox = Instance.new("SelectionBox")
+                selectionBox.Color3 = Color3.fromRGB(255, 230, 0)
+                selectionBox.LineThickness = 0.05
+                selectionBox.Adornee = char
+                selectionBox.Parent = char
+                
+                ActiveHighlights[p.UserId] = selectionBox
+            end
+            break
+        end
+    end
+end)
+
 -- Core Speed Tick Frame Loop
 task.spawn(function()
     while task.wait(0.1) do
@@ -573,4 +759,42 @@ task.spawn(function()
             if hum then hum.WalkSpeed = TargetWalkSpeed end
         end
     end
+end)
+
+-- --- RUN LOADING ANIMATION SEQUENCING ---
+task.spawn(function()
+    -- Step 1: Connecting
+    task.wait(0.5)
+    LoadingStatus.Text = "Checking Client Authorization..."
+    TweenService:Create(ProgressFill, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.25, 0, 1, 0)}):Play()
+    
+    -- Step 2: Injecting styles
+    task.wait(0.8)
+    LoadingStatus.Text = "Rendering Modern UI Assemblies..."
+    TweenService:Create(ProgressFill, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.55, 0, 1, 0)}):Play()
+    
+    -- Step 3: Compiling features
+    task.wait(0.9)
+    LoadingStatus.Text = "Compiling Advanced ESP Modules..."
+    TweenService:Create(ProgressFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.85, 0, 1, 0)}):Play()
+    
+    -- Step 4: Wrapping up
+    task.wait(0.6)
+    LoadingStatus.Text = "Welcome, NotBurning2000!"
+    TweenService:Create(ProgressFill, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+    task.wait(0.5)
+    
+    -- Fade out Loading Screen and transition to Main Panel
+    local fadeTime = 0.4
+    TweenService:Create(LoadingFrame, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(Glow, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 1}):Play()
+    TweenService:Create(PanelTitle, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+    TweenService:Create(PanelSubtitle, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+    TweenService:Create(ProgressTrack, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(ProgressFill, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(LoadingStatus, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+    
+    task.wait(fadeTime)
+    LoadingFrame:Destroy() -- Safe cleanup
+    MainFrame.Visible = true -- Display core admin panel smoothly
 end)
