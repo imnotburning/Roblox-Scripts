@@ -385,7 +385,6 @@ end
 -- --- MOVEMENT BUTTON CALLS ---
 local FlyBtn = quickBtn(MovePage, "FLY: OFF", Color3.fromRGB(180, 40, 40), function(btn)
     IsFlying = not IsFlying
-    btn.Text = IsFlying perks and "FLY: ACTIVE" or "FLY: OFF"
     btn.Text = IsFlying and "FLY: ACTIVE" or "FLY: OFF"
     btn.BackgroundColor3 = IsFlying and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(180, 40, 40)
     if IsFlying then startFlight() else stopFlight() end
