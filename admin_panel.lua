@@ -26,13 +26,10 @@ local SelectedTeams = {}
 local ActiveEspConnections = {} 
 local flightConnection, noclipConnection, bodyGyro, bodyVel
 
--- Fling Target Storage
-local SelectedFlingTarget = ""
-
 -- --- CREATE GUI LAYOUT ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BurningsAdminPanelGui"
-ScreenGui.Parent = PlayerGui -- FIXED: Parented to PlayerGui to bypass mobile executor blocks
+ScreenGui.Parent = PlayerGui
 ScreenGui.ResetOnSpawn = false
 
 -- --- MAIN ADMIN PANEL ---
@@ -53,7 +50,7 @@ local function makePage(name, visible)
     page.Size = UDim2.new(1, 0, 1, -40)
     page.Position = UDim2.new(0, 0, 0, 40)
     page.BackgroundTransparency = 1
-    page.CanvasSize = UDim2.new(0, 0, 0, 360)
+    page.CanvasSize = UDim2.new(0, 0, 0, 300)
     page.ScrollBarThickness = 3
     page.Visible = visible
     page.Parent = MainFrame
@@ -516,184 +513,12 @@ local Hop = quickBtn(MiscPage, "Server Hop", Color3.fromRGB(40, 40, 55), functio
     end
 end)
 
--- --- FLING PHYSICS ENGINE ---
-local function FlingPlayer(targetPlayer)
-    if not targetPlayer or targetPlayer == LocalPlayer then return end
-    local myChar = LocalPlayer.Character
-    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    
-    local targetChar = targetPlayer.Character
-    local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-    
-    if not myHrp or not myHum or not targetHrp then return end
-    
-    local oldVelocity = myHrp.AssemblyLinearVelocity
-    local oldCFrame = myHrp.CFrame
-    
-    local speedOverridden = TargetWalkSpeed
-    TargetWalkSpeed = 0
-    myHum.WalkSpeed = 0
-    
-    local noclipLoop = RunService.Stepped:Connect(function()
-        for _, part in ipairs(myChar:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
-        end
-    end)
-    
-    local forceTime = 1.5
-    local start = os.clock()
-    local flingVelocity = Vector3.new(99999, 99999, 99999)
-    local flingRot = Vector3.new(0, 99999, 0)
-    
-    while os.clock() - start < forceTime do
-        RunService.RenderStepped:Wait()
-        if not targetHrp or not targetHrp.Parent or not myHrp then break end
-        
-        myHrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-1, 1), 0, math.random(-1, 1))
-        myHrp.AssemblyLinearVelocity = flingVelocity
-        myHrp.AssemblyAngularVelocity = flingRot
-    end
-    
-    noclipLoop:Disconnect()
-    myHrp.AssemblyLinearVelocity = oldVelocity
-    myHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-    myChar:PivotTo(oldCFrame)
-    
-    TargetWalkSpeed = speedOverridden
-    myHum.WalkSpeed = TargetWalkSpeed
-end
-
--- --- DROPDOWN & FLING INTERFACES ---
-local DropdownHeader = Instance.new("TextLabel")
-DropdownHeader.Size = UDim2.new(0.9, 0, 0, 20)
-DropdownHeader.BackgroundTransparency = 1
-DropdownHeader.Text = "Fling Engine (Username Dropdown):"
-DropdownHeader.TextColor3 = Color3.fromRGB(200, 200, 200)
-DropdownHeader.Font = Enum.Font.SourceSansBold
-DropdownHeader.TextSize = 12
-DropdownHeader.TextXAlignment = Enum.TextXAlignment.Left
-DropdownHeader.Parent = MiscPage
-
-local SelectBtn = Instance.new("TextButton")
-SelectBtn.Size = UDim2.new(0.9, 0, 0, 25)
-SelectBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-SelectBtn.Text = "Select Target: [None]"
-SelectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SelectBtn.Font = Enum.Font.SourceSansBold
-SelectBtn.TextSize = 11
-SelectBtn.Parent = MiscPage
-Instance.new("UICorner", SelectBtn).CornerRadius = UDim.new(0, 4)
-
-local DropList = Instance.new("ScrollingFrame")
-DropList.Size = UDim2.new(0.9, 0, 0, 100)
-DropList.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
-DropList.BorderSizePixel = 0
-DropList.CanvasSize = UDim2.new(0, 0, 0, 0)
-DropList.ScrollBarThickness = 3
-DropList.Visible = false
-DropList.Parent = MiscPage
-Instance.new("UICorner", DropList).CornerRadius = UDim.new(0, 4)
-
-local DropLayout = Instance.new("UIListLayout")
-DropLayout.Parent = DropList
-DropLayout.Padding = UDim.new(0, 3)
-
-local function updateDropdown()
-    for _, old in ipairs(DropList:GetChildren()) do
-        if not old:IsA("UIListLayout") then old:Destroy() end
-    end
-    
-    local canvasSize = 0
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local option = Instance.new("TextButton")
-            option.Size = UDim2.new(1, 0, 0, 20)
-            option.BackgroundTransparency = 1
-            option.Text = p.Name
-            option.TextColor3 = Color3.fromRGB(180, 180, 190)
-            option.Font = Enum.Font.SourceSans
-            option.TextSize = 11
-            option.Parent = DropList
-            canvasSize = canvasSize + 23
-            
-            option.MouseButton1Click:Connect(function()
-                SelectedFlingTarget = p.Name
-                SelectBtn.Text = "Select Target: " .. p.Name
-                DropList.Visible = false
-            end)
-        end
-    end
-    DropList.CanvasSize = UDim2.new(0, 0, 0, canvasSize)
-end
-
-SelectBtn.MouseButton1Click:Connect(function()
-    DropList.Visible = not DropList.Visible
-    if DropList.Visible then updateDropdown() end
-end)
-
-Players.PlayerAdded:Connect(updateDropdown)
-Players.PlayerRemoving:Connect(updateDropdown)
-
-local ExecuteFlingBtn = quickBtn(MiscPage, "Fling Selected Player", Color3.fromRGB(220, 40, 40), function()
-    local target = Players:FindFirstChild(SelectedFlingTarget)
-    if target then FlingPlayer(target) end
-end)
-
--- Team Fling Interface Row
-local TeamFlingRow = Instance.new("Frame")
-TeamFlingRow.Size = UDim2.new(0.9, 0, 0, 26)
-TeamFlingRow.BackgroundTransparency = 1
-TeamFlingRow.Parent = MiscPage
-
-local TeamFlingInput = Instance.new("TextBox")
-TeamFlingInput.Size = UDim2.new(0.6, 0, 1, 0)
-TeamFlingInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-TeamFlingInput.PlaceholderText = "Team Name..."
-TeamFlingInput.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
-TeamFlingInput.Text = ""
-TeamFlingInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeamFlingInput.Font = Enum.Font.SourceSansBold
-TeamFlingInput.TextSize = 12
-TeamFlingInput.Parent = TeamFlingRow
-Instance.new("UICorner", TeamFlingInput).CornerRadius = UDim.new(0, 4)
-
-local TeamFlingBtn = Instance.new("TextButton")
-TeamFlingBtn.Size = UDim2.new(0.35, 0, 1, 0)
-TeamFlingBtn.Position = UDim2.new(0.65, 0, 0, 0)
-TeamFlingBtn.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
-TeamFlingBtn.Text = "Fling Team"
-TeamFlingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeamFlingBtn.Font = Enum.Font.SourceSansBold
-TeamFlingBtn.TextSize = 11
-TeamFlingBtn.Parent = TeamFlingRow
-Instance.new("UICorner", TeamFlingBtn).CornerRadius = UDim.new(0, 4)
-
-TeamFlingBtn.MouseButton1Click:Connect(function()
-    local q = string.lower(TeamFlingInput.Text)
-    local targetTeam = nil
-    for _, t in ipairs(Teams:GetTeams()) do
-        if string.sub(string.lower(t.Name), 1, #q) == q then
-            targetTeam = t
-            break
-        end
-    end
-    if targetTeam then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Team == targetTeam then
-                FlingPlayer(p)
-                task.wait(0.2)
-            end
-        end
-    end
-end)
-
-local FlingAllBtn = quickBtn(MiscPage, "Fling All Players", Color3.fromRGB(160, 20, 20), function()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            FlingPlayer(p)
-            task.wait(0.2)
-        end
+-- FIXED/ADDED: Client Character Reset Utility (No Fling)
+local ResetBtn = quickBtn(MiscPage, "Reset Character", Color3.fromRGB(180, 40, 40), function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.Health = 0 -- Triggers the natural game respawn instantly
     end
 end)
 
@@ -706,6 +531,7 @@ WalkBox.FocusLost:Connect(function()
     WalkBox.Text = tostring(TargetWalkSpeed)
 end)
 
+-- Flight Speed Setup
 FlyBox.FocusLost:Connect(function()
     local n = tonumber(FlyBox.Text)
     TargetFlySpeed = n and math.clamp(n, 0, 500) or TargetFlySpeed
