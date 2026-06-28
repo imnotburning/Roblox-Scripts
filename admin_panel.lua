@@ -1,6 +1,9 @@
 -- Destroy old GUI to prevent overlapping
-if game.CoreGui:FindFirstChild("BurningsAdminPanelGui") then
-    game.CoreGui.BurningsAdminPanelGui:Destroy()
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+if PlayerGui:FindFirstChild("BurningsAdminPanelGui") then
+    PlayerGui.BurningsAdminPanelGui:Destroy()
 end
 
 -- Services
@@ -10,7 +13,6 @@ local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
 
 -- Global Configuration & States
 local AuthorizedUsername = "NotBurning2000"
@@ -30,52 +32,8 @@ local SelectedFlingTarget = ""
 -- --- CREATE GUI LAYOUT ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BurningsAdminPanelGui"
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Parent = PlayerGui -- FIXED: Parented to PlayerGui to bypass mobile executor blocks
 ScreenGui.ResetOnSpawn = false
-
--- --- SLEEK LOADING FRAME ---
-local LoadingFrame = Instance.new("Frame")
-LoadingFrame.Size = UDim2.new(0, 260, 0, 130)
-LoadingFrame.Position = UDim2.new(0.5, -130, 0.4, -65)
-LoadingFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-LoadingFrame.BorderSizePixel = 0
-LoadingFrame.Parent = ScreenGui
-Instance.new("UICorner", LoadingFrame).CornerRadius = UDim.new(0, 8)
-
-local LoadTitle = Instance.new("TextLabel")
-LoadTitle.Size = UDim2.new(1, 0, 0, 30)
-LoadTitle.Position = UDim2.new(0, 0, 0.15, 0)
-LoadTitle.BackgroundTransparency = 1
-LoadTitle.Text = "Verifying Credentials..."
-LoadTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
-LoadTitle.Font = Enum.Font.SourceSansBold
-LoadTitle.TextSize = 14
-LoadTitle.Parent = LoadingFrame
-
-local LoadStatus = Instance.new("TextLabel")
-LoadStatus.Size = UDim2.new(1, 0, 0, 20)
-LoadStatus.Position = UDim2.new(0, 0, 0.4, 0)
-LoadStatus.BackgroundTransparency = 1
-LoadStatus.Text = "Checking User Identity..."
-LoadStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
-LoadStatus.Font = Enum.Font.SourceSans
-LoadStatus.TextSize = 12
-LoadStatus.Parent = LoadingFrame
-
-local BarBG = Instance.new("Frame")
-BarBG.Size = UDim2.new(0.8, 0, 0, 6)
-BarBG.Position = UDim2.new(0.1, 0, 0.65, 0)
-BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-BarBG.BorderSizePixel = 0
-BarBG.Parent = LoadingFrame
-Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1, 0)
-
-local BarFill = Instance.new("Frame")
-BarFill.Size = UDim2.new(0, 0, 1, 0)
-BarFill.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-BarFill.BorderSizePixel = 0
-BarFill.Parent = BarBG
-Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
 
 -- --- MAIN ADMIN PANEL ---
 local MainFrame = Instance.new("Frame")
@@ -84,7 +42,7 @@ MainFrame.Position = UDim2.new(0.5, -130, 0.4, -135)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Visible = false -- Starts hidden during verification
+MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
@@ -95,7 +53,7 @@ local function makePage(name, visible)
     page.Size = UDim2.new(1, 0, 1, -40)
     page.Position = UDim2.new(0, 0, 0, 40)
     page.BackgroundTransparency = 1
-    page.CanvasSize = UDim2.new(0, 0, 0, 360) -- Tall canvas to scroll both Server utility & new Fling sections
+    page.CanvasSize = UDim2.new(0, 0, 0, 360)
     page.ScrollBarThickness = 3
     page.Visible = visible
     page.Parent = MainFrame
@@ -170,7 +128,6 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 -- --- PAGE ELEMENTS ---
--- Status Text (Global Layout Header)
 local status = Instance.new("TextLabel")
 status.Size = UDim2.new(0.9, 0, 0, 20)
 status.BackgroundTransparency = 1
@@ -180,7 +137,6 @@ status.Font = Enum.Font.SourceSansBold
 status.TextSize = 12
 status.Parent = MovePage
 
--- Inputs Utility
 local function createInputRow(parent, labelText, defaultVal)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(0.9, 0, 0, 25)
@@ -214,7 +170,6 @@ end
 local WalkBox = createInputRow(MovePage, "Walk Speed:", "16")
 local FlyBox = createInputRow(MovePage, "Fly Speed:", "50")
 
--- Action Buttons Utility
 local function quickBtn(parent, text, bgCol, clickCallback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 28)
@@ -258,7 +213,7 @@ TpBtn.TextSize = 12
 TpBtn.Parent = TpRow
 Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 4)
 
--- Combat ESP Elements
+-- ESP Elements
 local EspBtn = quickBtn(CombatPage, "ESP: OFF", Color3.fromRGB(180, 40, 40), function(btn)
     EspActive = not EspActive
     btn.Text = EspActive and "ESP: ACTIVE" or "ESP: OFF"
@@ -275,7 +230,7 @@ local TeamLay = Instance.new("UIListLayout")
 TeamLay.Parent = TeamScroll
 TeamLay.Padding = UDim.new(0, 4)
 
--- Admins Elements
+-- Admins Card
 local AdminCard = Instance.new("Frame")
 AdminCard.Size = UDim2.new(0.9, 0, 0, 60)
 AdminCard.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -561,7 +516,7 @@ local Hop = quickBtn(MiscPage, "Server Hop", Color3.fromRGB(40, 40, 55), functio
     end
 end)
 
--- --- THE PHYSICAL FLING PHYSICS ENGINE ---
+-- --- FLING PHYSICS ENGINE ---
 local function FlingPlayer(targetPlayer)
     if not targetPlayer or targetPlayer == LocalPlayer then return end
     local myChar = LocalPlayer.Character
@@ -573,26 +528,21 @@ local function FlingPlayer(targetPlayer)
     
     if not myHrp or not myHum or not targetHrp then return end
     
-    -- Secure & Cache Local Physics States
     local oldVelocity = myHrp.AssemblyLinearVelocity
     local oldCFrame = myHrp.CFrame
     
-    -- Disable custom speed loop momentarily during flight
     local speedOverridden = TargetWalkSpeed
     TargetWalkSpeed = 0
     myHum.WalkSpeed = 0
     
-    -- Strip Collisions
     local noclipLoop = RunService.Stepped:Connect(function()
         for _, part in ipairs(myChar:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
     end)
     
-    -- Spin & Fling Loop Execution
-    local forceTime = 1.5 -- Spin target for 1.5s
+    local forceTime = 1.5
     local start = os.clock()
-    
     local flingVelocity = Vector3.new(99999, 99999, 99999)
     local flingRot = Vector3.new(0, 99999, 0)
     
@@ -600,19 +550,16 @@ local function FlingPlayer(targetPlayer)
         RunService.RenderStepped:Wait()
         if not targetHrp or not targetHrp.Parent or not myHrp then break end
         
-        -- Orbit and ram the target physics block
         myHrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-1, 1), 0, math.random(-1, 1))
         myHrp.AssemblyLinearVelocity = flingVelocity
         myHrp.AssemblyAngularVelocity = flingRot
     end
     
-    -- Clean & Re-align Local Physics States
     noclipLoop:Disconnect()
     myHrp.AssemblyLinearVelocity = oldVelocity
     myHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     myChar:PivotTo(oldCFrame)
     
-    -- Restore Movement speeds
     TargetWalkSpeed = speedOverridden
     myHum.WalkSpeed = TargetWalkSpeed
 end
@@ -628,7 +575,6 @@ DropdownHeader.TextSize = 12
 DropdownHeader.TextXAlignment = Enum.TextXAlignment.Left
 DropdownHeader.Parent = MiscPage
 
--- Selection Button (Displays current selected target)
 local SelectBtn = Instance.new("TextButton")
 SelectBtn.Size = UDim2.new(0.9, 0, 0, 25)
 SelectBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -639,7 +585,6 @@ SelectBtn.TextSize = 11
 SelectBtn.Parent = MiscPage
 Instance.new("UICorner", SelectBtn).CornerRadius = UDim.new(0, 4)
 
--- Scrolling list containing other players
 local DropList = Instance.new("ScrollingFrame")
 DropList.Size = UDim2.new(0.9, 0, 0, 100)
 DropList.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
@@ -690,7 +635,6 @@ end)
 Players.PlayerAdded:Connect(updateDropdown)
 Players.PlayerRemoving:Connect(updateDropdown)
 
--- Run Fling on Dropdown Selected Player
 local ExecuteFlingBtn = quickBtn(MiscPage, "Fling Selected Player", Color3.fromRGB(220, 40, 40), function()
     local target = Players:FindFirstChild(SelectedFlingTarget)
     if target then FlingPlayer(target) end
@@ -744,12 +688,11 @@ TeamFlingBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Fling All System Button
 local FlingAllBtn = quickBtn(MiscPage, "Fling All Players", Color3.fromRGB(160, 20, 20), function()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
             FlingPlayer(p)
-            task.wait(0.2) -- Tiny safety delay between flings
+            task.wait(0.2)
         end
     end
 end)
@@ -763,7 +706,6 @@ WalkBox.FocusLost:Connect(function()
     WalkBox.Text = tostring(TargetWalkSpeed)
 end)
 
--- Fly settings update
 FlyBox.FocusLost:Connect(function()
     local n = tonumber(FlyBox.Text)
     TargetFlySpeed = n and math.clamp(n, 0, 500) or TargetFlySpeed
@@ -804,58 +746,5 @@ task.spawn(function()
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = TargetWalkSpeed end
         end
-    end
-end)
-
--- --- VERIFICATION AND ANIMATED LOADING SEQUENCE ---
-task.spawn(function()
-    task.wait(0.5)
-    
-    -- Step 1: Loading Assets
-    LoadStatus.Text = "Initializing Interface Assets..."
-    local fill1 = TweenService:Create(BarFill, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0.4, 0, 1, 0)})
-    fill1:Play()
-    fill1.Completed:Wait()
-    task.wait(0.3)
-    
-    -- Step 2: Verification Check
-    LoadStatus.Text = "Checking User Authorization..."
-    local fill2 = TweenService:Create(BarFill, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0.7, 0, 1, 0)})
-    fill2:Play()
-    fill2.Completed:Wait()
-    
-    -- AUTHENTICATION LOGIC
-    if LocalPlayer.Name == AuthorizedUsername then
-        -- Access Granted
-        LoadStatus.Text = "Access Granted! Loading Panel..."
-        LoadStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-        
-        local fill3 = TweenService:Create(BarFill, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
-        fill3:Play()
-        fill3.Completed:Wait()
-        task.wait(0.4)
-        
-        -- Fade loading screen out and open main panel
-        local fadeOut = TweenService:Create(LoadingFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-        TweenService:Create(LoadTitle, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
-        TweenService:Create(LoadStatus, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
-        TweenService:Create(BarBG, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(BarFill, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-        
-        fadeOut:Play()
-        fadeOut.Completed:Wait()
-        LoadingFrame:Destroy()
-        
-        -- Show Main Admin Panel
-        MainFrame.Visible = true
-    else
-        -- Access Denied (Non-Authorized User)
-        LoadStatus.Text = "Access Denied: Unauthorized User!"
-        LoadStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        BarFill.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        task.wait(1.5)
-        
-        -- Kick the player from the game
-        LocalPlayer:Kick("\n[Burnings Admin Panel]\n\nSecurity System Triggered: Access Denied.")
     end
 end)
