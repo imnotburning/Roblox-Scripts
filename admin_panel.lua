@@ -451,8 +451,9 @@ local function startFlight()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
     
-    -- Strip physical movement controls so game physics won't pull the player down
+    -- Strip physical movement controls and locally anchor to prevent game gravity pull
     hum.PlatformStand = true
+    hrp.Anchored = true
     
     flightConnection = RunService.RenderStepped:Connect(function(dt)
         local camera = workspace.CurrentCamera
@@ -483,7 +484,11 @@ end
 local function stopFlight()
     if flightConnection then flightConnection:Disconnect() end
     local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hrp then
+        hrp.Anchored = false
+    end
     if hum then
         hum.PlatformStand = false
     end
@@ -758,24 +763,39 @@ end)
 
 -- --- RUN LOADING ANIMATION SEQUENCING ---
 task.spawn(function()
-    -- Step 1: Connecting
+    -- Step 1: Core setup
     task.wait(0.5)
-    LoadingStatus.Text = "Checking Client Authorization..."
+    LoadingStatus.Text = "Checking Client Environment..."
     TweenService:Create(ProgressFill, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.25, 0, 1, 0)}):Play()
     
-    -- Step 2: Injecting styles
+    -- Step 2: Dynamic Administrator Validation Check
     task.wait(0.8)
-    LoadingStatus.Text = "Rendering Modern UI Assemblies..."
+    LoadingStatus.Text = "Verifying Admin Permissions..."
     TweenService:Create(ProgressFill, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.55, 0, 1, 0)}):Play()
     
-    -- Step 3: Compiling features
-    task.wait(0.9)
-    LoadingStatus.Text = "Compiling Advanced ESP Modules..."
+    task.wait(0.6)
+    -- Active validation sequence
+    if LocalPlayer.Name == AuthorizedUsername then
+        LoadingStatus.Text = "Access Granted! Loading modules..."
+        LoadingStatus.TextColor3 = Color3.fromRGB(150, 255, 150) -- Turn text green on success
+    else
+        -- Access Denied sequence
+        LoadingStatus.Text = "Access Denied: Unrecognized Administrator."
+        LoadingStatus.TextColor3 = Color3.fromRGB(255, 60, 60) -- Turn text red on error
+        ProgressFill.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        task.wait(2)
+        ScreenGui:Destroy() -- Self-destruct UI if not authenticated
+        return
+    end
+    
+    -- Step 3: Compile features
+    task.wait(0.5)
+    LoadingStatus.Text = "Compiling ESP Modules & Interfaces..."
     TweenService:Create(ProgressFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.85, 0, 1, 0)}):Play()
     
     -- Step 4: Wrapping up
     task.wait(0.6)
-    LoadingStatus.Text = "Welcome, NotBurning2000!"
+    LoadingStatus.Text = "Welcome back, " .. AuthorizedUsername .. "!"
     TweenService:Create(ProgressFill, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
     task.wait(0.5)
     
