@@ -9,6 +9,7 @@ local Teams = game:GetService("Teams")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Global Configuration & States
@@ -29,12 +30,58 @@ ScreenGui.Name = "BurningsAdminPanelGui"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 
+-- --- SLEEK LOADING FRAME ---
+local LoadingFrame = Instance.new("Frame")
+LoadingFrame.Size = UDim2.new(0, 260, 0, 130)
+LoadingFrame.Position = UDim2.new(0.5, -130, 0.4, -65)
+LoadingFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+LoadingFrame.BorderSizePixel = 0
+LoadingFrame.Parent = ScreenGui
+Instance.new("UICorner", LoadingFrame).CornerRadius = UDim.new(0, 8)
+
+local LoadTitle = Instance.new("TextLabel")
+LoadTitle.Size = UDim2.new(1, 0, 0, 30)
+LoadTitle.Position = UDim2.new(0, 0, 0.15, 0)
+LoadTitle.BackgroundTransparency = 1
+LoadTitle.Text = "Verifying Credentials..."
+LoadTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
+LoadTitle.Font = Enum.Font.SourceSansBold
+LoadTitle.TextSize = 14
+LoadTitle.Parent = LoadingFrame
+
+local LoadStatus = Instance.new("TextLabel")
+LoadStatus.Size = UDim2.new(1, 0, 0, 20)
+LoadStatus.Position = UDim2.new(0, 0, 0.4, 0)
+LoadStatus.BackgroundTransparency = 1
+LoadStatus.Text = "Checking User Identity..."
+LoadStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+LoadStatus.Font = Enum.Font.SourceSans
+LoadStatus.TextSize = 12
+LoadStatus.Parent = LoadingFrame
+
+local BarBG = Instance.new("Frame")
+BarBG.Size = UDim2.new(0.8, 0, 0, 6)
+BarBG.Position = UDim2.new(0.1, 0, 0.65, 0)
+BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+BarBG.BorderSizePixel = 0
+BarBG.Parent = LoadingFrame
+Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1, 0)
+
+local BarFill = Instance.new("Frame")
+BarFill.Size = UDim2.new(0, 0, 1, 0)
+BarFill.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+BarFill.BorderSizePixel = 0
+BarFill.Parent = BarBG
+Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
+
+-- --- MAIN ADMIN PANEL ---
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 260, 0, 270)
 MainFrame.Position = UDim2.new(0.5, -130, 0.4, -135)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.Visible = false -- Starts hidden during verification
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
@@ -560,5 +607,58 @@ task.spawn(function()
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = TargetWalkSpeed end
         end
+    end
+end)
+
+-- --- VERIFICATION AND ANIMATED LOADING SEQUENCE ---
+task.spawn(function()
+    task.wait(0.5)
+    
+    -- Step 1: Loading Assets
+    LoadStatus.Text = "Initializing Interface Assets..."
+    local fill1 = TweenService:Create(BarFill, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0.4, 0, 1, 0)})
+    fill1:Play()
+    fill1.Completed:Wait()
+    task.wait(0.3)
+    
+    -- Step 2: Verification Check
+    LoadStatus.Text = "Checking User Authorization..."
+    local fill2 = TweenService:Create(BarFill, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0.7, 0, 1, 0)})
+    fill2:Play()
+    fill2.Completed:Wait()
+    
+    -- AUTHENTICATION LOGIC
+    if LocalPlayer.Name == AuthorizedUsername then
+        -- Access Granted
+        LoadStatus.Text = "Access Granted! Loading Panel..."
+        LoadStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        local fill3 = TweenService:Create(BarFill, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
+        fill3:Play()
+        fill3.Completed:Wait()
+        task.wait(0.4)
+        
+        -- Fade loading screen out and open main panel
+        local fadeOut = TweenService:Create(LoadingFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+        TweenService:Create(LoadTitle, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+        TweenService:Create(LoadStatus, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+        TweenService:Create(BarBG, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(BarFill, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        LoadingFrame:Destroy()
+        
+        -- Show Main Admin Panel
+        MainFrame.Visible = true
+    else
+        -- Access Denied (Non-Authorized User)
+        LoadStatus.Text = "Access Denied: Unauthorized User!"
+        LoadStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        BarFill.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        task.wait(1.5)
+        
+        -- Kick the player from the game
+        LocalPlayer:Kick("\n[Burnings Admin Panel]\n\nSecurity System Triggered: Access Denied.")
     end
 end)
