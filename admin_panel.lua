@@ -1,7 +1,11 @@
--- Destroy old GUI to prevent overlapping
+-- Destroy old GUI to prevent overlapping (Checks both CoreGui and PlayerGui)
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = game:GetService("Players").LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
+if CoreGui:FindFirstChild("BurningsAdminPanelGui") then
+    CoreGui.BurningsAdminPanelGui:Destroy()
+end
 if PlayerGui:FindFirstChild("BurningsAdminPanelGui") then
     PlayerGui.BurningsAdminPanelGui:Destroy()
 end
@@ -29,10 +33,16 @@ local flightConnection, noclipConnection, bodyGyro, bodyVel
 -- Highlight Storage
 local ActiveHighlights = {}
 
--- --- CREATE GUI LAYOUT ---
+-- --- CREATE GUI LAYOUT ON COREGUI (FORCES TOP LAYER) ---
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BurningsAdminPanelGui"
-ScreenGui.Parent = PlayerGui
+ScreenGui.DisplayOrder = 99999 -- Ensures maximum draw priority
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = PlayerGui -- Safe fallback if exploit lacks CoreGui access
+end
 ScreenGui.ResetOnSpawn = false
 
 -- --- MAIN ADMIN PANEL ---
@@ -650,14 +660,13 @@ HighlightBtn.MouseButton1Click:Connect(function()
         if p ~= LocalPlayer and (string.sub(string.lower(p.Name), 1, #query) == query or string.sub(string.lower(p.DisplayName), 1, #query) == query) then
             local char = p.Character
             if char then
-                -- Clear previous highlights on this player if any exist
                 if ActiveHighlights[p.UserId] then
                     ActiveHighlights[p.UserId]:Destroy()
                 end
                 
                 -- Create standard client visual 3D selection outline
                 local selectionBox = Instance.new("SelectionBox")
-                selectionBox.Color3 = Color3.fromRGB(255, 230, 0) -- Visible Gold
+                selectionBox.Color3 = Color3.fromRGB(255, 230, 0)
                 selectionBox.LineThickness = 0.05
                 selectionBox.Adornee = char
                 selectionBox.Parent = char
